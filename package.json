@@ -1,0 +1,30 @@
+{
+	"name": "diamond-gatherer-softvision",
+	"version": "1.0.0",
+	"description": "",
+	"main": "sever.js",
+	"scripts": {
+		"test": "echo \"Error: no test specified\" && exit 1",
+		"start": "nodemon ./app.js"
+	},
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/sergomet/diamond-gatherer-softvision.git"
+	},
+	"author": "",
+	"license": "ISC",
+	"bugs": {
+		"url": "https://github.com/sergomet/diamond-gatherer-softvision/issues"
+	},
+	"homepage": "https://github.com/sergomet/diamond-gatherer-softvision#readme",
+	"dependencies": {
+		"express": "^4.17.1",
+		"express-handlebars": "^5.2.0",
+		"mustache-express": "^1.3.0",
+		"socket.io": "^3.0.3",
+		"squirrelly": "^8.0.8"
+	},
+	"devDependencies": {
+		"nodemon": "^2.0.6"
+	}
+}
