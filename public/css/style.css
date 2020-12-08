@@ -38,7 +38,10 @@ canvas {
 #game-canvas {
 	border: 1px solid black;
 }
-.enter-chat {
-	font-style: italic;
-	color: rgb(66, 66, 66);
+
+.game-element {
+	border: 1px solid black;
+	text-align: center;
+	padding: 10px;
+	margin: 10px;
 }

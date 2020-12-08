@@ -1,13 +1,11 @@
 const express = require('express');
-const { parse } = require('path');
 const app = express();
 const http = require('http').createServer(app);
 const io = require('socket.io')(http);
 
-const Game = require('./app/game');
-const Player = require('./app/player');
-
-let counter = 0;
+const SpaceRanger = require('./app/models/space_ranger');
+const PinkLady = require('./app/models/pink_lady');
+const Game = require('./app/models/game');
 
 http.listen(5000, function () {
 	console.log('[SERVER STARTED AT PORT 5000]');
@@ -17,76 +15,93 @@ app.get('/', function (request, response) {
 	response.sendFile(__dirname + '/index.html');
 });
 
-app.get('/about', function (request, response) {
-	response.sendFile(__dirname + '/about.html');
-});
-
 app.use(express.static(__dirname + '/public'));
 
 io.on('connection', function (socket) {
 	console.log('[SOCKET CONNECTED]' + socket.id);
-
-	socket.emit('counter', counter);
-	socket.on('counter-add', function () {
-		counter++;
-		console.log('[COUNTER ADD]', counter);
-		io.sockets.emit('counter', counter);
-	});
-
-	socket.on('join-chat', function (userName) {
-		console.log('[USER JOINED CHAT]', socket.id, userName);
-		chatUsers[socket.id] = userName;
-		socket.join('chat');
-		socket.emit('joined-chat');
-		io.to('chat').emit('users_online-chat', Object.keys(chatUsers).length);
-		socket.to('chat').emit('enter-chat', `${userName} has joined the chat.`);
-	});
-
-	socket.on('send-message', function (message, color) {
-		console.log('[USER SENT MESSAGE]', message);
-		io.to('chat').emit(
-			'new-message',
-			`${chatUsers[socket.id]}: <span style="color: ${color}">${message}</span>`
-		);
-	});
-
-	socket.on('leave-chat', function () {
-		console.log('[USER LEFT CHAT]', socket.id);
-		let userName = chatUsers[socket.id];
-		delete chatUsers[socket.id];
-		socket.leave('chat');
-		socket.emit('menu');
-		io.to('chat').emit('users_online-chat', Object.keys(chatUsers).length);
-		io.to('chat').emit('users_online-chat', Object.keys(chatUsers).length);
-		socket.to('chat').emit('enter-chat', `${userName} has left the chat.`);
+	socket.join('menu');
+	Object.keys(games).forEach(function (gameId) {
+		if (games[gameId].players.length === 1) {
+			socket.emit('add-game-to-list', {
+				gameName: games[gameId].name,
+				gameId: gameId,
+			});
+		}
 	});
 
 	socket.on('create-game', function (gameName) {
 		console.log('[NEW GAME CREATED]');
 		const gameId = 'game-' + socket.id;
-		const players = [new Player()];
+		players[socket.id] = new SpaceRanger({
+			gameId: gameId,
+			socketId: socket.id,
+		});
 		const game = new Game({
 			id: gameId,
-			players: players,
+			players: [players[socket.id]],
+			name: gameName,
 		});
-
-		setInterval(function () {
-			gameLoop(game.id);
-		}, 1000 / 60);
-
 		games[gameId] = game;
 		console.log('[User joined ' + gameId + '] room');
 		socket.join(gameId);
+		io.to('menu').emit('add-game-to-list', {
+			gameName: gameName,
+			gameId: gameId,
+		});
+	});
+
+	socket.on('start-moving-player', function (direction) {
+		if (players[socket.id]) {
+			players[socket.id].startMoving(direction);
+			// console.log('[MOVE PLAYER]', direction)
+		}
+	});
+
+	socket.on('stop-moving-player', function (axis) {
+		if (players[socket.id]) {
+			players[socket.id].stopMoving(axis);
+			// console.log('[STOP PLAYER]', axis)
+		}
+	});
+
+	socket.on('join-game', function (gameId) {
+		console.log(`[SOCKET ${socket.id} JOINED GAME ${gameId}]`);
+		players[socket.id] = new PinkLady({ gameId: gameId, socketId: socket.id });
+		games[gameId].players.push(players[socket.id]);
+		socket.join(gameId);
+		io.to('menu').emit('remove-game-from-list', gameId);
+	});
+
+	socket.on('disconnect', function () {
+		console.log(`[SOCKET ${socket.id} DISCONNECTED]`);
+		if (players[socket.id]) {
+			const gameId = players[socket.id].gameId;
+			const game = games[gameId];
+			const playersToRemoveIds = game.players.map(function (player) {
+				return player.socketId;
+			});
+			clearInterval(game.interval);
+			delete games[gameId];
+			playersToRemoveIds.forEach(function (playerToRemoveId) {
+				delete players[playerToRemoveId];
+			});
+			io.to(gameId).emit('game-over', 'Player disconnected');
+		}
 	});
 });
 
 function gameLoop(id) {
-	const objectsForDraw = [];
-	games[id].players.forEach(function (player) {
-		objectsForDraw.push(player.forDraw());
-	});
-	io.to(id).emit('game-loop', objectsForDraw);
+	if (games[id]) {
+		games[id].update();
+		const objectsForDraw = [];
+		games[id].players.forEach(function (player) {
+			objectsForDraw.push(player.forDraw());
+		});
+		io.to(id).emit('game-loop', objectsForDraw);
+	}
 }
 
-const chatUsers = {};
 const games = {};
+const players = {};
+
+module.exports.gameLoop = gameLoop;
