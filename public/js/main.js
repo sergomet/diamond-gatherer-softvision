@@ -107,9 +107,10 @@ document
 	});
 
 socket.on('menu', function () {
-	console.log('You left chat!');
+	// console.log('You left chat!');
 	document.getElementById('menu').classList.remove('display-none');
 	document.getElementById('chat-container').classList.add('display-none');
+	document.getElementById('game-container').classList.add('display-none');
 });
 
 document
@@ -129,17 +130,41 @@ document
 		}
 	});
 
-socket.on('game-loop', function (objectsForDraw) {
+socket.on('game-loop', function (data) {
 	document.getElementById('menu').classList.add('display-none');
+	document.getElementById('back-to-menu').classList.add('display-none');
 	document.getElementById('game-container').classList.remove('display-none');
 	context.drawImage(document.getElementById('map-image'), 0, 0);
 
-	objectsForDraw.forEach(function (objectForDraw) {
+	data.objectsForDraw.forEach(function (objectForDraw) {
 		context.drawImage(
 			document.getElementById(objectForDraw.imageId),
 			...objectForDraw.drawImageParameters
 		);
 	});
+
+	if (data.gameInProgress) {
+		document
+			.getElementById('waiting-for-players')
+			.classList.add('display-none');
+		document.getElementById('score-container').classList.remove('display-none');
+		document.getElementById('space-ranger-score').innerHTML =
+			data.score['space-ranger'];
+		document.getElementById('pink-lady-score').innerHTML =
+			data.score['pink-lady'];
+		document.getElementById(
+			'diamonds-left'
+		).innerHTML = data.objectsForDraw.filter(
+			(item) => item.imageId === 'diamond'
+		).length;
+
+		console.dir(data);
+	} else {
+		document
+			.getElementById('waiting-for-players')
+			.classList.remove('display-none');
+		document.getElementById('score-container').classList.add('display-none');
+	}
 });
 
 document.addEventListener('keydown', function (event) {
@@ -157,6 +182,10 @@ document.addEventListener('keydown', function (event) {
 		}
 		case 'ArrowRight': {
 			socket.emit('start-moving-player', 'right');
+			break;
+		}
+		case ' ': {
+			socket.emit('attack');
 			break;
 		}
 	}
@@ -199,19 +228,16 @@ socket.on('remove-game-from-list', function (gameId) {
 	document.getElementById(gameId).classList.add('display-none');
 });
 
-socket.on('game-over', function (reason) {
-	console.log('Game Over', reason);
-	context.font = '30px Arial';
-	context.fillText(`Game Over! ${reason}`, 50, 250);
+socket.on('game-over', function (imageId, gameId) {
+	context.drawImage(document.getElementById(imageId), 0, 0);
+	document.getElementById('back-to-menu').classList.remove('display-none');
+	document.getElementById('back-to-menu').dataset.gameId = gameId;
+	document.getElementById('score-container').classList.add('display-none');
+});
 
-	const gameContainer = document.getElementById('game-container');
-	const backToMenuButton = document.createElement('button');
-	backToMenuButton.innerHTML = 'Back to menu';
-
-	backToMenuButton.addEventListener('click', function () {
-		document.getElementById('menu').classList.remove('display-none');
-		gameContainer.classList.add('display-none');
-	});
-
-	gameContainer.appendChild(backToMenuButton);
+document.getElementById('back-to-menu').addEventListener('click', function () {
+	socket.emit(
+		'back-to-menu',
+		document.getElementById('back-to-menu').dataset.gameId
+	);
 });

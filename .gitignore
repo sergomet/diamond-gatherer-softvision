@@ -1,2 +1,4 @@
 diamond-gatherer
 node_modules
+.DS_Store
+public/.DS_Store
